@@ -1,71 +1,140 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Video Call (PeerJS)</title>
+  <title>Video Call + Chat (Permanent ID)</title>
   <style>
     body { font-family: Arial, sans-serif; text-align: center; background: #f2f2f2; }
     video { width: 45%; border: 2px solid #333; margin: 10px; border-radius: 8px; }
-    #myId { font-weight: bold; color: #2c3e50; }
-    input, button { padding: 8px; margin: 5px; }
+    #chatBox { width: 90%; max-width: 500px; height: 200px; border: 1px solid #333; 
+               margin: 10px auto; padding: 5px; overflow-y: auto; background: #fff; text-align: left; }
+    #chatInput { width: 70%; padding: 5px; }
+    button { padding: 8px 12px; margin: 5px; }
   </style>
 </head>
 <body>
-  <h2>PeerJS Video Calls</h2>
-  
+  <h2>Video Call + Chat</h2>
+
+  <!-- Step 1: Login with Permanent ID -->
+  <p>Enter Your Permanent ID: 
+    <input id="myIdInput" placeholder="e.g. jeswin123">
+    <button onclick="registerId()">Register</button>
+  </p>
   <p>Your ID: <span id="myId"></span></p>
-  <input id="otherId" placeholder="Enter friend ID">
-  <button onclick="callPeer()">Call</button>
-  
+
+  <!-- Step 2: Call another ID -->
+  <p>Enter Friend ID: <input id="otherId" placeholder="Enter friend's ID">
+    <button onclick="callPeer()">Call</button>
+  </p>
+
+  <!-- Video Section -->
   <div>
     <video id="localVideo" autoplay playsinline muted></video>
     <video id="remoteVideo" autoplay playsinline></video>
   </div>
-  
+
+  <!-- Chat Section -->
+  <div id="chatBox"></div>
+  <input id="chatInput" placeholder="Type a message...">
+  <button onclick="sendMessage()">Send</button>
+
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script>
-    // Create Peer with TURN + STUN
-    const peer = new Peer({
-      config: {
-        'iceServers': [
-          { url: 'stun:stun.l.google.com:19302' }, // Free STUN
-          {
-            url: 'turn:relay1.expressturn.com:3478',
-            username: 'ef9c1e',
-            credential: 'rjfeFJSHn87'
-          }
-        ]
-      }
-    });
-
+    let peer, conn;
+    const chatBox = document.getElementById("chatBox");
     const localVideo = document.getElementById("localVideo");
     const remoteVideo = document.getElementById("remoteVideo");
 
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
-      localVideo.srcObject = stream;
+    // Auto-load saved ID from localStorage
+    window.onload = () => {
+      const savedId = localStorage.getItem("permanentId");
+      if (savedId) {
+        document.getElementById("myIdInput").value = savedId;
+        registerId(); // auto register with saved ID
+      }
+    };
 
-      // Answer incoming call
-      peer.on("call", call => {
-        call.answer(stream);
-        call.on("stream", remoteStream => {
-          remoteVideo.srcObject = remoteStream;
+    function registerId() {
+      const myIdValue = document.getElementById("myIdInput").value.trim();
+      if (!myIdValue) {
+        alert("Please enter a permanent ID!");
+        return;
+      }
+
+      // Save ID to localStorage
+      localStorage.setItem("permanentId", myIdValue);
+
+      // Create Peer with custom ID
+      peer = new Peer(myIdValue, {
+        config: {
+          'iceServers': [
+            { url: 'stun:stun.l.google.com:19302' },
+            {
+              url: 'turn:relay1.expressturn.com:3478',
+              username: 'ef9c1e',
+              credential: 'rjfeFJSHn87'
+            }
+          ]
+        }
+      });
+
+      peer.on("open", id => {
+        document.getElementById("myId").innerText = id;
+      });
+
+      // Handle incoming call
+      navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
+        localVideo.srcObject = stream;
+
+        peer.on("call", call => {
+          call.answer(stream);
+          call.on("stream", remoteStream => {
+            remoteVideo.srcObject = remoteStream;
+          });
         });
       });
-    });
 
-    // Show your PeerJS ID
-    peer.on("open", id => {
-      document.getElementById("myId").innerText = id;
-    });
+      // Handle incoming chat connection
+      peer.on("connection", connection => {
+        conn = connection;
+        conn.on("data", msg => {
+          chatBox.innerHTML += `<p><b>${conn.peer}:</b> ${msg}</p>`;
+          chatBox.scrollTop = chatBox.scrollHeight;
+        });
+      });
+    }
 
     // Call another peer
     function callPeer() {
-      const otherId = document.getElementById("otherId").value;
+      const otherId = document.getElementById("otherId").value.trim();
+      if (!otherId) {
+        alert("Enter friend's ID!");
+        return;
+      }
+
       navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
         const call = peer.call(otherId, stream);
         call.on("stream", remoteStream => {
           remoteVideo.srcObject = remoteStream;
         });
       });
+
+      // Connect for chat
+      conn = peer.connect(otherId);
+      conn.on("data", msg => {
+        chatBox.innerHTML += `<p><b>${otherId}:</b> ${msg}</p>`;
+        chatBox.scrollTop = chatBox.scrollHeight;
+      });
+    }
+
+    // Send chat message
+    function sendMessage() {
+      const msg = document.getElementById("chatInput").value;
+      if (msg && conn) {
+        conn.send(msg);
+        chatBox.innerHTML += `<p><b>You:</b> ${msg}</p>`;
+        document.getElementById("chatInput").value = "";
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }
     }
   </script>
 </body>
