@@ -1,118 +1,57 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>Multilingual Chat + Video</title>
+  <title>Video Call (No Backend)</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; }
-    #videos { display: flex; gap: 10px; margin-bottom: 10px; }
-    video { width: 300px; border: 1px solid #000; }
-    #chat-box { border: 1px solid #ccc; height: 200px; overflow-y: scroll; padding: 10px; }
+    body { font-family: Arial; text-align: center; }
+    video { width: 45%; border: 1px solid black; margin: 5px; }
   </style>
 </head>
 <body>
-  <h2>Multilingual Video Chat</h2>
-
-  <label>Your Language:
-    <select id="myLang">
-      <option value="en">English</option>
-      <option value="uk">Ukrainian</option>
-      <option value="ru">Russian</option>
-    </select>
-  </label>
-
+  <h2>PeerJS Video Call</h2>
+  
+  <p>Your ID: <span id="myId"></span></p>
+  <input id="otherId" placeholder="Enter friend ID">
+  <button onclick="callPeer()">Call</button>
+  
   <div>
-    <p>Your ID: <span id="my-id"></span></p>
-    <input id="peer-id" placeholder="Enter friend's ID" />
-    <button onclick="connect()">Connect</button>
+    <video id="localVideo" autoplay playsinline muted></video>
+    <video id="remoteVideo" autoplay playsinline></video>
   </div>
-
-  <div id="videos">
-    <video id="localVideo" autoplay muted></video>
-    <video id="remoteVideo" autoplay></video>
-  </div>
-
-  <div id="chat-box"></div>
-  <input type="text" id="msg" placeholder="Type a message..." />
-  <button onclick="sendMessage()">Send</button>
-
-  <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+  
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script>
-    const myLang = document.getElementById("myLang");
-    const msgInput = document.getElementById("msg");
-    const chatBox = document.getElementById("chat-box");
+    // Create peer connection
+    const peer = new Peer();
     const localVideo = document.getElementById("localVideo");
     const remoteVideo = document.getElementById("remoteVideo");
 
-    const peer = new Peer();
-    let conn;
-    let call;
-
-    peer.on("open", (id) => {
-      document.getElementById("my-id").textContent = id;
-    });
-
-    peer.on("connection", (connection) => {
-      conn = connection;
-      setupChat();
-    });
-
-    peer.on("call", async (incomingCall) => {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
       localVideo.srcObject = stream;
-      incomingCall.answer(stream);
-      incomingCall.on("stream", (remoteStream) => {
-        remoteVideo.srcObject = remoteStream;
-      });
-      call = incomingCall;
-    });
 
-    async function connect() {
-      const peerId = document.getElementById("peer-id").value;
-      conn = peer.connect(peerId);
-      conn.on("open", () => setupChat());
-
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      localVideo.srcObject = stream;
-      call = peer.call(peerId, stream);
-      call.on("stream", (remoteStream) => {
-        remoteVideo.srcObject = remoteStream;
-      });
-    }
-
-    function sendMessage() {
-      const text = msgInput.value;
-      if (!text || !conn) return;
-      conn.send({ text, lang: myLang.value });
-      displayMessage("You", text);
-      msgInput.value = "";
-    }
-
-    function setupChat() {
-      conn.on("data", async ({ text, lang }) => {
-        const translated = await translateText(text, lang, myLang.value);
-        displayMessage(`Partner (${lang})`, translated);
-      });
-    }
-
-    function displayMessage(sender, text) {
-      chatBox.innerHTML += `<div><b>${sender}:</b> ${text}</div>`;
-      chatBox.scrollTop = chatBox.scrollHeight;
-    }
-
-    async function translateText(text, from, to) {
-      if (from === to) return text;
-      try {
-        const res = await fetch("https://libretranslate.com/translate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ q: text, source: from, target: to, format: "text" })
+      // Answer call
+      peer.on("call", call => {
+        call.answer(stream);
+        call.on("stream", remoteStream => {
+          remoteVideo.srcObject = remoteStream;
         });
-        const data = await res.json();
-        return data.translatedText;
-      } catch (e) {
-        return "[Translation error]";
-      }
+      });
+    });
+
+    // Show your ID
+    peer.on("open", id => {
+      document.getElementById("myId").innerText = id;
+    });
+
+    // Call another peer
+    function callPeer() {
+      const otherId = document.getElementById("otherId").value;
+      navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
+        const call = peer.call(otherId, stream);
+        call.on("stream", remoteStream => {
+          remoteVideo.srcObject = remoteStream;
+        });
+      });
     }
   </script>
 </body>
