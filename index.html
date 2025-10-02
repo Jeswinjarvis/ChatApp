@@ -1,141 +1,252 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Video Call + Chat (Permanent ID)</title>
+  <meta charset="UTF-8">
+  <title>Video Call + Chat App</title>
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; background: #f2f2f2; }
-    video { width: 45%; border: 2px solid #333; margin: 10px; border-radius: 8px; }
-    #chatBox { width: 90%; max-width: 500px; height: 200px; border: 1px solid #333; 
-               margin: 10px auto; padding: 5px; overflow-y: auto; background: #fff; text-align: left; }
-    #chatInput { width: 70%; padding: 5px; }
-    button { padding: 8px 12px; margin: 5px; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      background: linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .container {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+      padding: 20px;
+      max-width: 950px;
+      width: 95%;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    h2 {
+      text-align: center;
+      color: #333;
+      margin: 0;
+    }
+
+    .section {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 15px;
+    }
+
+    input {
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+      width: 220px;
+    }
+
+    button {
+      padding: 10px 16px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+      transition: 0.2s;
+      font-size: 14px;
+    }
+
+    button:hover { opacity: 0.85; }
+
+    .btn-register { background-color: #4a69bd; color: #fff; }
+    .btn-call { background-color: #38ada9; color: #fff; }
+    .btn-send { background-color: #ff793f; color: #fff; }
+
+    .video-section {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+
+    video {
+      width: 45%;
+      border-radius: 16px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+      background: #000;
+    }
+
+    .chat-container {
+      display: flex;
+      flex-direction: column;
+      border-radius: 16px;
+      border: 1px solid #ccc;
+      overflow: hidden;
+      background: #fafafa;
+      max-height: 300px;
+    }
+
+    #chatBox {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+    }
+
+    #chatBox p {
+      margin: 5px 0;
+      padding: 8px 12px;
+      border-radius: 12px;
+      max-width: 80%;
+    }
+
+    #chatBox p.user { background-color: #38ada9; color: #fff; margin-left: auto; }
+    #chatBox p.friend { background-color: #eee; color: #333; margin-right: auto; }
+
+    .chat-input {
+      display: flex;
+      border-top: 1px solid #ccc;
+    }
+
+    #chatInput {
+      flex: 1;
+      border: none;
+      padding: 10px;
+      font-size: 14px;
+    }
+
+    .status {
+      font-weight: bold;
+      color: green;
+      margin-left: 10px;
+    }
+
+    @media (max-width: 700px) {
+      video { width: 100%; }
+      input { width: 100%; }
+    }
   </style>
 </head>
 <body>
-  <h2>Video Call + Chat</h2>
 
-  <!-- Step 1: Login with Permanent ID -->
-  <p>Enter Your Permanent ID: 
-    <input id="myIdInput" placeholder="e.g. jeswin123">
-    <button onclick="registerId()">Register</button>
-  </p>
-  <p>Your ID: <span id="myId"></span></p>
+<div class="container">
+  <h2>Video Call + Chat App</h2>
 
-  <!-- Step 2: Call another ID -->
-  <p>Enter Friend ID: <input id="otherId" placeholder="Enter friend's ID">
-    <button onclick="callPeer()">Call</button>
-  </p>
+  <!-- Permanent ID Section -->
+  <div class="section">
+    <input id="myIdInput" placeholder="Your Permanent ID (e.g. jeswin123)">
+    <button class="btn-register" onclick="registerId()">Register</button>
+    <span id="myId"></span>
+  </div>
+
+  <!-- Call Friend Section -->
+  <div class="section">
+    <input id="otherId" placeholder="Friend's ID">
+    <button class="btn-call" onclick="callPeer()">Call</button>
+    <span id="friendStatus" class="status">Offline</span>
+  </div>
 
   <!-- Video Section -->
-  <div>
+  <div class="video-section">
     <video id="localVideo" autoplay playsinline muted></video>
     <video id="remoteVideo" autoplay playsinline></video>
   </div>
 
   <!-- Chat Section -->
-  <div id="chatBox"></div>
-  <input id="chatInput" placeholder="Type a message...">
-  <button onclick="sendMessage()">Send</button>
+  <div class="chat-container">
+    <div id="chatBox"></div>
+    <div class="chat-input">
+      <input id="chatInput" placeholder="Type a message...">
+      <button class="btn-send" onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+</div>
 
-  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-  <script>
-    let peer, conn;
-    const chatBox = document.getElementById("chatBox");
-    const localVideo = document.getElementById("localVideo");
-    const remoteVideo = document.getElementById("remoteVideo");
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<script>
+  let peer, conn;
+  const chatBox = document.getElementById("chatBox");
+  const localVideo = document.getElementById("localVideo");
+  const remoteVideo = document.getElementById("remoteVideo");
+  const friendStatus = document.getElementById("friendStatus");
 
-    // Auto-load saved ID from localStorage
-    window.onload = () => {
-      const savedId = localStorage.getItem("permanentId");
-      if (savedId) {
-        document.getElementById("myIdInput").value = savedId;
-        registerId(); // auto register with saved ID
-      }
-    };
-
-    function registerId() {
-      const myIdValue = document.getElementById("myIdInput").value.trim();
-      if (!myIdValue) {
-        alert("Please enter a permanent ID!");
-        return;
-      }
-
-      // Save ID to localStorage
-      localStorage.setItem("permanentId", myIdValue);
-
-      // Create Peer with custom ID
-      peer = new Peer(myIdValue, {
-        config: {
-          'iceServers': [
-            { url: 'stun:stun.l.google.com:19302' },
-            {
-              url: 'turn:relay1.expressturn.com:3478',
-              username: 'ef9c1e',
-              credential: 'rjfeFJSHn87'
-            }
-          ]
-        }
-      });
-
-      peer.on("open", id => {
-        document.getElementById("myId").innerText = id;
-      });
-
-      // Handle incoming call
-      navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
-        localVideo.srcObject = stream;
-
-        peer.on("call", call => {
-          call.answer(stream);
-          call.on("stream", remoteStream => {
-            remoteVideo.srcObject = remoteStream;
-          });
-        });
-      });
-
-      // Handle incoming chat connection
-      peer.on("connection", connection => {
-        conn = connection;
-        conn.on("data", msg => {
-          chatBox.innerHTML += `<p><b>${conn.peer}:</b> ${msg}</p>`;
-          chatBox.scrollTop = chatBox.scrollHeight;
-        });
-      });
+  // Load saved ID
+  window.onload = () => {
+    const savedId = localStorage.getItem("permanentId");
+    if (savedId) {
+      document.getElementById("myIdInput").value = savedId;
+      registerId();
     }
+  };
 
-    // Call another peer
-    function callPeer() {
-      const otherId = document.getElementById("otherId").value.trim();
-      if (!otherId) {
-        alert("Enter friend's ID!");
-        return;
+  function registerId() {
+    const myIdValue = document.getElementById("myIdInput").value.trim();
+    if(!myIdValue) { alert("Enter a permanent ID!"); return; }
+
+    localStorage.setItem("permanentId", myIdValue);
+
+    peer = new Peer(myIdValue, {
+      config: {
+        'iceServers': [
+          { url: 'stun:stun.l.google.com:19302' },
+          { url: 'turn:relay1.expressturn.com:3478', username: 'ef9c1e', credential: 'rjfeFJSHn87' }
+        ]
       }
+    });
 
-      navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
-        const call = peer.call(otherId, stream);
-        call.on("stream", remoteStream => {
+    peer.on("open", id => { document.getElementById("myId").innerText = id; });
+
+    navigator.mediaDevices.getUserMedia({video:true,audio:true}).then(stream=>{
+      localVideo.srcObject = stream;
+      peer.on("call", call=>{
+        call.answer(stream);
+        call.on("stream", remoteStream=>{
           remoteVideo.srcObject = remoteStream;
         });
       });
+    });
 
-      // Connect for chat
-      conn = peer.connect(otherId);
-      conn.on("data", msg => {
-        chatBox.innerHTML += `<p><b>${otherId}:</b> ${msg}</p>`;
-        chatBox.scrollTop = chatBox.scrollHeight;
+    peer.on("connection", connection=>{
+      conn = connection;
+      friendStatus.innerText = "Online";
+      conn.on("data", msg=>{ addMessage(conn.peer, msg); });
+      conn.on("close", ()=>{ friendStatus.innerText="Offline"; });
+    });
+  }
+
+  function callPeer() {
+    const otherId = document.getElementById("otherId").value.trim();
+    if(!otherId){ alert("Enter friend's ID"); return; }
+
+    navigator.mediaDevices.getUserMedia({video:true,audio:true}).then(stream=>{
+      const call = peer.call(otherId, stream);
+      call.on("stream", remoteStream=>{
+        remoteVideo.srcObject = remoteStream;
       });
-    }
+    });
 
-    // Send chat message
-    function sendMessage() {
-      const msg = document.getElementById("chatInput").value;
-      if (msg && conn) {
-        conn.send(msg);
-        chatBox.innerHTML += `<p><b>You:</b> ${msg}</p>`;
-        document.getElementById("chatInput").value = "";
-        chatBox.scrollTop = chatBox.scrollHeight;
-      }
+    conn = peer.connect(otherId);
+    conn.on("open", ()=>{ friendStatus.innerText="Online"; });
+    conn.on("data", msg=>{ addMessage(otherId, msg); });
+    conn.on("close", ()=>{ friendStatus.innerText="Offline"; });
+  }
+
+  function sendMessage() {
+    const msg = document.getElementById("chatInput").value;
+    if(msg && conn){
+      conn.send(msg);
+      addMessage("You", msg);
+      document.getElementById("chatInput").value = "";
     }
-  </script>
+  }
+
+  function addMessage(sender, msg){
+    const p = document.createElement("p");
+    p.innerHTML = `<b>${sender}:</b> ${msg}`;
+    p.className = sender === "You" ? "user" : "friend";
+    chatBox.appendChild(p);
+    chatBox.scrollTop = chatBox.scrollHeight;
+  }
+</script>
 </body>
 </html>
