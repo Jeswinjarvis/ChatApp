@@ -24,11 +24,7 @@
       flex-direction: column;
       gap: 20px;
     }
-    h2 {
-      text-align: center;
-      color: #333;
-      margin: 0;
-    }
+    h2 { text-align: center; color: #333; margin: 0; }
     .section { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; }
     input {
       padding: 10px; border-radius: 10px; border: 1px solid #ccc;
@@ -42,21 +38,20 @@
     .btn-register { background-color: #4a69bd; color: #fff; }
     .btn-call { background-color: #38ada9; color: #fff; }
     .btn-send { background-color: #ff793f; color: #fff; }
-    .video-section {
-      display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;
-    }
-    video {
-      width: 45%; border-radius: 16px; box-shadow: 0 6px 20px rgba(0,0,0,0.2); background: #000;
-    }
+    .btn-end { background-color: #e74c3c; color: #fff; }
+    .btn-toggle { background-color: #f39c12; color: #fff; }
+    .video-section { display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; }
+    video { width: 45%; border-radius: 16px; box-shadow: 0 6px 20px rgba(0,0,0,0.2); background: #000; }
+    .controls { display: flex; justify-content: center; gap: 10px; margin-top: 10px; }
     .chat-container {
       display: flex; flex-direction: column; border-radius: 16px; border: 1px solid #ccc;
       overflow: hidden; background: #fafafa; max-height: 300px;
     }
     #chatBox { flex: 1; overflow-y: auto; padding: 10px; }
-    #chatBox p { margin: 5px 0; padding: 8px 12px; border-radius: 12px; max-width: 80%; }
+    #chatBox p { margin: 5px 0; padding: 8px 12px; border-radius: 12px; max-width: 80%; word-wrap: break-word; }
     #chatBox p.user { background-color: #38ada9; color: #fff; margin-left: auto; }
     #chatBox p.friend { background-color: #eee; color: #333; margin-right: auto; }
-    .chat-input { display: flex; border-top: 1px solid #ccc; }
+    .chat-input { display: flex; border-top: 1px solid #ccc; gap: 5px; }
     #chatInput { flex: 1; border: none; padding: 10px; font-size: 14px; }
     .status { font-weight: bold; color: green; margin-left: 10px; }
     @media (max-width: 700px) { video { width: 100%; } input { width: 100%; } }
@@ -86,19 +81,28 @@
     <video id="remoteVideo" autoplay playsinline></video>
   </div>
 
+  <!-- Controls -->
+  <div class="controls">
+    <button class="btn-toggle" onclick="toggleMic()">🎤 Mute/Unmute</button>
+    <button class="btn-toggle" onclick="toggleCamera()">📷 On/Off</button>
+    <button class="btn-end" onclick="endCall()">❌ End Call</button>
+  </div>
+
   <!-- Chat Section -->
   <div class="chat-container">
     <div id="chatBox"></div>
     <div class="chat-input">
       <input id="chatInput" placeholder="Type a message...">
       <button class="btn-send" onclick="sendMessage()">Send</button>
+      <input type="file" id="fileInput" style="display:none" onchange="sendFile(event)">
+      <button class="btn-send" onclick="document.getElementById('fileInput').click()">📎</button>
     </div>
   </div>
 </div>
 
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script>
-  let peer, conn;
+  let peer, conn, currentCall, localStream;
   const chatBox = document.getElementById("chatBox");
   const localVideo = document.getElementById("localVideo");
   const remoteVideo = document.getElementById("remoteVideo");
@@ -111,6 +115,10 @@
       document.getElementById("myIdInput").value = savedId;
       registerId();
     }
+    // Send chat on Enter
+    document.getElementById("chatInput").addEventListener("keypress", function(e) {
+      if (e.key === "Enter") sendMessage();
+    });
   };
 
   function registerId() {
@@ -130,8 +138,10 @@
     peer.on("open", id => { document.getElementById("myId").innerText = "Your ID: " + id; });
 
     navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
+      localStream = stream;
       localVideo.srcObject = stream;
       peer.on("call", call => {
+        currentCall = call;
         call.answer(stream);
         call.on("stream", remoteStream => { remoteVideo.srcObject = remoteStream; });
       });
@@ -140,7 +150,13 @@
     peer.on("connection", connection => {
       conn = connection;
       friendStatus.innerText = "Online";
-      conn.on("data", msg => { addMessage(conn.peer, msg); });
+      conn.on("data", msg => {
+        if (msg.file) {
+          addFileMessage(conn.peer, msg);
+        } else {
+          addMessage(conn.peer, msg);
+        }
+      });
       conn.on("close", () => { friendStatus.innerText = "Offline"; });
     });
   }
@@ -150,13 +166,21 @@
     if (!otherId) { alert("Enter friend's ID!"); return; }
 
     navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
+      localStream = stream;
       const call = peer.call(otherId, stream);
+      currentCall = call;
       call.on("stream", remoteStream => { remoteVideo.srcObject = remoteStream; });
     });
 
     conn = peer.connect(otherId);
     conn.on("open", () => { friendStatus.innerText = "Online"; });
-    conn.on("data", msg => { addMessage(otherId, msg); });
+    conn.on("data", msg => {
+      if (msg.file) {
+        addFileMessage(otherId, msg);
+      } else {
+        addMessage(otherId, msg);
+      }
+    });
     conn.on("close", () => { friendStatus.innerText = "Offline"; });
   }
 
@@ -169,12 +193,67 @@
     }
   }
 
+  function sendFile(event) {
+    const file = event.target.files[0];
+    if (file && conn) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const data = {
+          file: e.target.result,
+          fileName: file.name,
+          fileType: file.type
+        };
+        conn.send(data);
+        addFileMessage("You", data);
+      };
+      reader.readAsArrayBuffer(file);
+    }
+    event.target.value = "";
+  }
+
   function addMessage(sender, msg) {
     const p = document.createElement("p");
     p.innerHTML = `<b>${sender}:</b> ${msg}`;
     p.className = sender === "You" ? "user" : "friend";
     chatBox.appendChild(p);
     chatBox.scrollTop = chatBox.scrollHeight;
+  }
+
+  function addFileMessage(sender, data) {
+    const p = document.createElement("p");
+    const blob = new Blob([data.file], { type: data.fileType });
+    const url = URL.createObjectURL(blob);
+    p.innerHTML = `<b>${sender}:</b> <a href="${url}" download="${data.fileName}">📎 ${data.fileName}</a>`;
+    p.className = sender === "You" ? "user" : "friend";
+    chatBox.appendChild(p);
+    chatBox.scrollTop = chatBox.scrollHeight;
+  }
+
+  function toggleMic() {
+    if (localStream) {
+      localStream.getAudioTracks().forEach(track => track.enabled = !track.enabled);
+    }
+  }
+
+  function toggleCamera() {
+    if (localStream) {
+      localStream.getVideoTracks().forEach(track => track.enabled = !track.enabled);
+    }
+  }
+
+  function endCall() {
+    if (currentCall) {
+      currentCall.close();
+      remoteVideo.srcObject = null;
+    }
+    if (localStream) {
+      localStream.getTracks().forEach(track => track.stop());
+      localVideo.srcObject = null;
+    }
+    if (conn) {
+      conn.close();
+      friendStatus.innerText = "Offline";
+    }
   }
 </script>
 </body>
